@@ -3,9 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:provider/provider.dart';
 
 import '../agent/agent_controller.dart';
 import '../ai_brain.dart';
+import '../network_auditor.dart';
+import '../providers/aura_state_provider.dart';
 import '../secure_vault.dart';
 import '../theme/aura_tokens.dart';
 import 'aura_core_screen.dart';
@@ -99,6 +102,12 @@ class _SplashScreenState extends State<SplashScreen>
       });
       final modelReady = await _aiBrain.preloadModel();
       if (!mounted) return;
+      // The console is authenticated: start listening to native DNS/SNI
+      // events so blocked/DGA hosts reach the local forest and the UI.
+      AuraNetworkAuditor.ensureStarted(
+        secureVault: _secureVault,
+        aiBrain: _aiBrain,
+      ).attachStateProvider(context.read<AuraStateProvider>());
       setState(() {
         _loadingProgress = 0.85;
         _bootStatusText = modelReady

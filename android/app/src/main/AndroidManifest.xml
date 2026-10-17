@@ -51,7 +51,7 @@
         </service>
 
         <service
-            android:name="com.aura.cyberdefense.AuraNotificationService"
+            android:name="com.ciberdefensa.aura.AuraNotificationService"
             android:exported="false"
             android:foregroundServiceType="specialUse"
             android:stopWithTask="false">

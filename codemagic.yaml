@@ -7,7 +7,7 @@ workflows:
       groups:
         - production_keys
       vars:
-        PACKAGE_NAME: "com.aura.cyberdefense"
+        PACKAGE_NAME: "com.ciberdefensa.aura"
         AURA_BUILD_FORMAT: "apk"
       # AURA_PUBLIC_KEY_ENV is injected by production_keys; store only the Base64 DER body there.
       flutter: stable

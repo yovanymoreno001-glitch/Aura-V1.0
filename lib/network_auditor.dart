@@ -6,9 +6,17 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 
 import 'ai_brain.dart';
+import 'providers/aura_state_provider.dart';
 import 'secure_vault.dart';
 
-enum NetworkAuditAction { blocked, dgaAlert, allowed }
+enum NetworkAuditAction { blocked, dgaAlert, allowed, echObserved }
+
+const Set<String> _platformActions = {
+  'BLOCKED',
+  'DGA_ALERT',
+  'ALLOWED',
+  'ECH_OBSERVED',
+};
 
 class NetworkAuditEvent {
   const NetworkAuditEvent({
@@ -32,9 +40,10 @@ class NetworkAuditEvent {
     final sourceApp = value['source_app'];
     final requestedDomain = value['requested_domain'];
     final action = value['action'];
-    if (timestamp is! num || sourceApp is! String ||
-      requestedDomain is! String ||
-      (action != 'BLOCKED' && action != 'DGA_ALERT' && action != 'ALLOWED')) {
+    if (timestamp is! num ||
+        sourceApp is! String ||
+        requestedDomain is! String ||
+        !_platformActions.contains(action)) {
       throw const FormatException('El evento de red tiene campos inválidos.');
     }
 
@@ -45,6 +54,7 @@ class NetworkAuditEvent {
       action: switch (action) {
         'BLOCKED' => NetworkAuditAction.blocked,
         'DGA_ALERT' => NetworkAuditAction.dgaAlert,
+        'ECH_OBSERVED' => NetworkAuditAction.echObserved,
         _ => NetworkAuditAction.allowed,
       },
     );
@@ -58,6 +68,7 @@ class NetworkAuditEvent {
           NetworkAuditAction.blocked => 'BLOCKED',
           NetworkAuditAction.dgaAlert => 'DGA_ALERT',
           NetworkAuditAction.allowed => 'ALLOWED',
+          NetworkAuditAction.echObserved => 'ECH_OBSERVED',
         },
       };
 }
@@ -65,7 +76,7 @@ class NetworkAuditEvent {
 class AuraNetworkAuditor {
   static const EventChannel _networkEvents =
       EventChannel('com.aura.cyberdefense/network_stream');
-    static const MethodChannel _engineChannel =
+  static const MethodChannel _engineChannel =
       MethodChannel('com.aura.cyberdefense/engine');
   static const int _maxRecentEvents = 500;
   static const int _maxPendingWrites = 256;
@@ -78,11 +89,28 @@ class AuraNetworkAuditor {
   final Queue<NetworkAuditEvent> _recentEvents = Queue<NetworkAuditEvent>();
   final Queue<Map<String, Object>> _pendingWrites =
       Queue<Map<String, Object>>();
-    final Queue<NetworkAuditEvent> _pendingThreatEvents =
+  final Queue<NetworkAuditEvent> _pendingThreatEvents =
       Queue<NetworkAuditEvent>();
   final AuraSecureVault _secureVault;
-    late final AuraAIBrain _aiBrain;
+  late final AuraAIBrain _aiBrain;
 
+  static AuraNetworkAuditor? _shared;
+
+  /// Returns the process-wide auditor, creating it on first use. The native
+  /// EventChannel only supports one listener, so every screen must share it.
+  static AuraNetworkAuditor ensureStarted({
+    AuraSecureVault? secureVault,
+    AuraAIBrain? aiBrain,
+  }) {
+    final existing = _shared;
+    if (existing != null && !existing._disposed) return existing;
+    return _shared =
+        AuraNetworkAuditor(secureVault: secureVault, aiBrain: aiBrain);
+  }
+
+  static AuraNetworkAuditor? get shared => _shared;
+
+  StreamSubscription<NetworkAuditEvent>? _providerSubscription;
   StreamSubscription<Object?>? _nativeSubscription;
   Future<void> _writeTask = Future<void>.value();
   bool _writing = false;
@@ -112,6 +140,15 @@ class AuraNetworkAuditor {
     );
   }
 
+  /// Forwards every native DNS/SNI event to the UI state provider.
+  void attachStateProvider(AuraStateProvider provider) {
+    unawaited(_providerSubscription?.cancel());
+    _providerSubscription = eventStream.listen(
+      (event) => provider.addTelemetryEvent(event.toJson()),
+      onError: (Object _) {},
+    );
+  }
+
   void toggleNetworkShield(bool active) {
     if (!_disposed) _networkShieldController.add(active);
   }
@@ -131,19 +168,23 @@ class AuraNetworkAuditor {
       throw RangeError.range(limit, 1, _maxRecentEvents, 'limit');
     }
     final events = _recentEvents.toList();
-    final selected = events.skip(events.length > limit ? events.length - limit : 0);
+    final selected =
+        events.skip(events.length > limit ? events.length - limit : 0);
     return jsonEncode({
       'event_type': 'network_dns_audit',
       'events': selected.map((event) => event.toJson()).toList(),
     });
   }
 
-    Future<String> analyzeRecentNetworkEvents({int limit = 100}) =>
+  Future<String> analyzeRecentNetworkEvents({int limit = 100}) =>
       _aiBrain.analyzeThreatPayload(buildTelemetryPayload(limit: limit));
 
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    if (identical(_shared, this)) _shared = null;
+    await _providerSubscription?.cancel();
+    _providerSubscription = null;
     await _nativeSubscription?.cancel();
     _nativeSubscription = null;
     await _writeTask;

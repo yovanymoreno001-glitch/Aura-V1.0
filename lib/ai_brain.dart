@@ -6,7 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'agent/aura_crypto_layer.dart';
+import 'crypto/aura_crypto_layer.dart';
 import 'agent/aura_whitelist.dart';
 import 'infrastructure/security/aura_dynamic_whitelist.dart';
 import 'models/aura_ai_brain.dart';

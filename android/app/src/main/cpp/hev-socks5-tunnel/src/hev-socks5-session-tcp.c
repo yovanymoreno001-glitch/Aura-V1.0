@@ -38,17 +38,26 @@ extern void hev_jni_report_dns_event (const char *domain, int action,
                                       uint32_t source_ipv4,
                                       uint16_t source_port);
 
+#define AURA_DNS_EVENT_SNI_BLOCKED 3
+#define AURA_DNS_EVENT_ECH_OBSERVED 4
+
 static void
-report_blocked_sni (HevSocks5SessionTCP *self, const char *sni)
+report_sni_event (HevSocks5SessionTCP *self, const char *sni, int action)
 {
     if (sni && sni[0] && self->pcb) {
         const uint32_t source_ipv4 =
             self->pcb->remote_ip.type == IPADDR_TYPE_V4
                 ? ip_2_ip4 (&self->pcb->remote_ip)->addr
                 : 0;
-        hev_jni_report_dns_event (sni, 3, source_ipv4,
+        hev_jni_report_dns_event (sni, action, source_ipv4,
                                   self->pcb->remote_port);
     }
+}
+
+static void
+report_blocked_sni (HevSocks5SessionTCP *self, const char *sni)
+{
+    report_sni_event (self, sni, AURA_DNS_EVENT_SNI_BLOCKED);
 }
 
 static int
@@ -58,6 +67,7 @@ tls_inspection_append (HevSocks5SessionTCP *self, const struct pbuf *p)
     size_t capacity;
     uint8_t *buffer;
     AuraTlsSniResult result;
+    uint32_t tls_flags = 0;
     char sni[254] = { 0 };
 
     if (p->tot_len > AURA_TLS_INSPECTION_LIMIT - self->tls_inspection_length)
@@ -84,9 +94,9 @@ tls_inspection_append (HevSocks5SessionTCP *self, const struct pbuf *p)
         return -1;
     self->tls_inspection_length = required;
 
-    result = aura_inspect_tls_sni (self->tls_inspection_buffer,
-                                   (uint32_t)self->tls_inspection_length,
-                                   sni, sizeof (sni));
+    result = aura_inspect_tls_client_hello (
+        self->tls_inspection_buffer, (uint32_t)self->tls_inspection_length,
+        sni, sizeof (sni), &tls_flags);
     if (result == AURA_TLS_SNI_INCOMPLETE) {
         if (self->tls_inspection_length == AURA_TLS_INSPECTION_LIMIT)
             return -1;
@@ -97,6 +107,11 @@ tls_inspection_append (HevSocks5SessionTCP *self, const struct pbuf *p)
         report_blocked_sni (self, sni);
         return -1;
     }
+
+    /* With ECH the visible SNI is only the outer public name; surface it so
+     * the Dart layer knows the real destination was not inspectable. */
+    if (tls_flags & AURA_TLS_FLAG_ECH)
+        report_sni_event (self, sni, AURA_DNS_EVENT_ECH_OBSERVED);
 
     self->tls_inspection_complete = 1;
     return 1;

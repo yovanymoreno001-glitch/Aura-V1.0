@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../ai_brain.dart';
 import '../secure_vault.dart';
-import 'aura_crypto_layer.dart';
+import '../crypto/aura_crypto_layer.dart';
 
 class ToolStep {
   const ToolStep({

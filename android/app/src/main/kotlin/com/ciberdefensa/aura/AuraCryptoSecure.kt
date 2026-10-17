@@ -1,4 +1,4 @@
-package com.aura.cyberdefense
+package com.ciberdefensa.aura
 
 import java.security.GeneralSecurityException
 import java.util.Arrays

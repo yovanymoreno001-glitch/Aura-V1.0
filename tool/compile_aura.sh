@@ -52,6 +52,9 @@ resolve_keystore() {
 
     [[ -n "${AURA_KEYSTORE_BASE64:-}" ]] ||
         fail "Missing release keystore: set AURA_KEYSTORE_PATH or AURA_KEYSTORE_BASE64."
+    # Secrets pasted from `base64` output often carry line wraps, CRLF or
+    # trailing spaces; strip all whitespace before decoding.
+    AURA_KEYSTORE_BASE64="$(printf '%s' "$AURA_KEYSTORE_BASE64" | tr -d '[:space:]')"
 
     local keystore_file
     keystore_file="$(mktemp "${TMPDIR:-/tmp}/aura-release-keystore.XXXXXX")"

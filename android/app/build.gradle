@@ -33,7 +33,7 @@ android {
         versionName "1.0.0"
 
         ndk {
-            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"
         }
     }
 
@@ -109,10 +109,22 @@ android.buildTypes.each { buildType ->
     def activeCertificateSha256 = activeSigningConfig == null
         ? null
         : signingCertificateSha256(activeSigningConfig)
+    // With Play App Signing, Google re-signs the APKs users install with the
+    // app signing key, so the upload-key digest alone would make every Play
+    // install fail the runtime check. AURA_EXTRA_ALLOWED_CERT_SHA256 accepts
+    // a comma-separated list (e.g. the app signing SHA-256 from Play Console).
+    def extraCertificates = (System.getenv("AURA_EXTRA_ALLOWED_CERT_SHA256") ?: "")
+        .split(",")
+        .collect { it.trim().replace(":", "").toUpperCase() }
+        .findAll { it ==~ /[0-9A-F]{64}/ }
+    def allowedCertificates = ([activeCertificateSha256] + extraCertificates)
+        .findAll { it }
+        .unique()
+        .join(",")
     buildType.buildConfigField(
         "String",
         "AURA_ALLOWED_CERT_SHA256",
-        "\"${activeCertificateSha256 ?: ''}\"",
+        "\"${allowedCertificates}\"",
     )
 }
 

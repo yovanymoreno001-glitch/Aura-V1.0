@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-class AuraAIInference {
+class AuraBinaryInference {
   static const List<String> auraStaticWhitelist = <String>[
     'google.com',
     'apple.com',

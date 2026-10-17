@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:aura_mobile_defens/inference/aura_ai_inference.dart';
+import 'package:aura_mobile_defens/inference/aura_binary_inference.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -48,17 +48,17 @@ void main() {
     ]);
   });
 
-  group('AuraAIInference binary forest validation', () {
+  group('AuraBinaryInference binary forest validation', () {
     test('allows official infrastructure through the static allowlist', () {
       expect(
-        AuraAIInference.evaluateHostFromBinary(
+        AuraBinaryInference.evaluateHostFromBinary(
           'google.com',
           validMockModelBytes,
         ),
         isTrue,
       );
       expect(
-        AuraAIInference.evaluateHostFromBinary(
+        AuraBinaryInference.evaluateHostFromBinary(
           'apple.com',
           validMockModelBytes,
         ),
@@ -68,7 +68,7 @@ void main() {
 
     test('rejects a threat vote from both indexed decision trees', () {
       expect(
-        AuraAIInference.evaluateHostFromBinary(
+        AuraBinaryInference.evaluateHostFromBinary(
           'x921llmzaqp0182ncnw.xyz',
           validMockModelBytes,
         ),
@@ -79,7 +79,7 @@ void main() {
     test('throws a controlled format exception for a corrupt magic signature',
         () {
       expect(
-        () => AuraAIInference.evaluateHostFromBinary(
+        () => AuraBinaryInference.evaluateHostFromBinary(
           'malicious-target.net',
           corruptMockModelBytes,
         ),
@@ -89,7 +89,7 @@ void main() {
 
     test('does not whitelist malformed URL-like input', () {
       expect(
-        AuraAIInference.evaluateHostFromBinary(
+        AuraBinaryInference.evaluateHostFromBinary(
           '://google.com',
           validMockModelBytes,
         ),

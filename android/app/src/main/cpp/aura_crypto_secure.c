@@ -45,7 +45,7 @@ clear_pending_exception_while_wiping (JNIEnv *env, jbyteArray key_bytes,
 }
 
 JNIEXPORT jbyteArray JNICALL
-Java_com_aura_cyberdefense_AuraCryptoSecure_decryptModelNative (
+Java_com_ciberdefensa_aura_AuraCryptoSecure_decryptModelNative (
     JNIEnv *env, jobject thiz, jbyteArray encrypted_data, jbyteArray key_bytes,
     jbyteArray iv_bytes)
 {

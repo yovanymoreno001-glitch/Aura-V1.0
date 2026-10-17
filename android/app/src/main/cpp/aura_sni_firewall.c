@@ -8,6 +8,8 @@
 #define AURA_MAX_DOMAIN_LENGTH 253
 #define AURA_MAX_TLS_RECORD_LENGTH 18432
 #define AURA_MAX_CLIENT_HELLO_LENGTH 65535
+#define AURA_TLS_EXT_SERVER_NAME 0x0000
+#define AURA_TLS_EXT_ECH 0xfe0d
 
 static const char *const doh_resolvers[] = {
     "cloudflare-dns.com",
@@ -215,8 +217,10 @@ copy_handshake_bytes (const uint8_t *payload, size_t payload_len,
 
 static AuraTlsSniResult
 inspect_client_hello (const uint8_t *hello, size_t hello_length, char *sni,
-                      size_t sni_capacity)
+                      size_t sni_capacity, uint32_t *flags)
 {
+    int sni_seen = 0;
+
     size_t cursor = 4;
     size_t body_end = hello_length;
     size_t session_id_length;
@@ -255,8 +259,10 @@ inspect_client_hello (const uint8_t *hello, size_t hello_length, char *sni,
         return AURA_TLS_SNI_MALFORMED;
     cursor += compression_methods_length;
 
-    if (cursor == body_end)
+    if (cursor == body_end) {
+        *flags |= AURA_TLS_FLAG_NO_SNI;
         return AURA_TLS_SNI_ALLOWED;
+    }
     if (body_end - cursor < 2)
         return AURA_TLS_SNI_MALFORMED;
     extensions_length = read_u16 (hello + cursor);
@@ -275,9 +281,17 @@ inspect_client_hello (const uint8_t *hello, size_t hello_length, char *sni,
             return AURA_TLS_SNI_MALFORMED;
         extension_end = cursor + extension_length;
 
-        if (extension_type == 0x0000) {
+        if (extension_type == AURA_TLS_EXT_ECH)
+            *flags |= AURA_TLS_FLAG_ECH;
+
+        if (extension_type == AURA_TLS_EXT_SERVER_NAME) {
             size_t name_cursor;
             size_t name_list_length;
+
+            /* RFC 6066: a ClientHello carries at most one server_name. */
+            if (sni_seen)
+                return AURA_TLS_SNI_MALFORMED;
+            sni_seen = 1;
 
             if (extension_length < 2)
                 return AURA_TLS_SNI_MALFORMED;
@@ -324,6 +338,8 @@ inspect_client_hello (const uint8_t *hello, size_t hello_length, char *sni,
     if (cursor != extensions_end)
         return AURA_TLS_SNI_MALFORMED;
 
+    if (!sni_seen)
+        *flags |= AURA_TLS_FLAG_NO_SNI;
     return AURA_TLS_SNI_ALLOWED;
 }
 
@@ -331,6 +347,16 @@ AuraTlsSniResult
 aura_inspect_tls_sni (const uint8_t *payload, uint32_t payload_len, char *sni,
                       size_t sni_capacity)
 {
+    return aura_inspect_tls_client_hello (payload, payload_len, sni,
+                                          sni_capacity, NULL);
+}
+
+AuraTlsSniResult
+aura_inspect_tls_client_hello (const uint8_t *payload, uint32_t payload_len,
+                               char *sni, size_t sni_capacity,
+                               uint32_t *flags)
+{
+    uint32_t local_flags = 0;
     uint8_t handshake_header[4];
     uint8_t *hello;
     uint32_t handshake_length;
@@ -338,6 +364,9 @@ aura_inspect_tls_sni (const uint8_t *payload, uint32_t payload_len, char *sni,
     int copied;
     AuraTlsSniResult result;
 
+    if (!flags)
+        flags = &local_flags;
+    *flags = 0;
     if (sni && sni_capacity)
         sni[0] = '\0';
     if (!payload && payload_len)
@@ -387,7 +416,8 @@ aura_inspect_tls_sni (const uint8_t *payload, uint32_t payload_len, char *sni,
         return AURA_TLS_SNI_MALFORMED;
     }
 
-    result = inspect_client_hello (hello, hello_length, sni, sni_capacity);
+    result = inspect_client_hello (hello, hello_length, sni, sni_capacity,
+                                   flags);
     free (hello);
     return result;
 }

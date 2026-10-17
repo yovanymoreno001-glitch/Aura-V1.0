@@ -1,4 +1,4 @@
-package com.aura.cyberdefense
+package com.ciberdefensa.aura
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -49,7 +49,7 @@ class AuraNotificationService : Service() {
     companion object {
         private const val STATUS_CHANNEL_ID = "aura_protection_status"
         private const val ALERT_CHANNEL_ID = "aura_firewall_alerts"
-        private const val ACTION_ALERT = "com.aura.cyberdefense.NOTIFY_OPERATOR"
+        private const val ACTION_ALERT = "com.ciberdefensa.aura.NOTIFY_OPERATOR"
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_BODY = "body"
         private const val FOREGROUND_NOTIFICATION_ID = 1019

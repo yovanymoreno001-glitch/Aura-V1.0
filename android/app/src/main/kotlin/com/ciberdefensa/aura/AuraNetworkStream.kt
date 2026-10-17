@@ -80,6 +80,7 @@ object AuraNetworkStream : EventChannel.StreamHandler {
         val action = when (actionCode) {
             2 -> "DGA_ALERT"
             1, 3 -> "BLOCKED"
+            4 -> "ECH_OBSERVED"
             else -> "ALLOWED"
         }
         synchronized(lock) {
@@ -102,7 +103,7 @@ object AuraNetworkStream : EventChannel.StreamHandler {
         if (actionCode == 3) {
             val context = synchronized(lock) { applicationContext }
             if (context != null) {
-                com.aura.cyberdefense.AuraNotificationService.triggerDgaAlert(
+                AuraNotificationService.triggerDgaAlert(
                     context,
                     domain,
                 )

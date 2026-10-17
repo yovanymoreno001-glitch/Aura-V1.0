@@ -13,6 +13,15 @@ typedef enum
     AURA_TLS_SNI_MALFORMED = 3
 } AuraTlsSniResult;
 
+/* Flags reported by aura_inspect_tls_client_hello(). */
+#define AURA_TLS_FLAG_ECH 0x1u    /* encrypted_client_hello (0xfe0d) present */
+#define AURA_TLS_FLAG_NO_SNI 0x2u /* ClientHello without server_name */
+
+AuraTlsSniResult aura_inspect_tls_client_hello (const uint8_t *payload,
+                                               uint32_t payload_len,
+                                               char *sni, size_t sni_capacity,
+                                               uint32_t *flags);
+
 AuraTlsSniResult aura_inspect_tls_sni (const uint8_t *payload,
                                       uint32_t payload_len, char *sni,
                                       size_t sni_capacity);

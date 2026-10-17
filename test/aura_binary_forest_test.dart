@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:aura_mobile_defens/inference/aura_ai_inference.dart';
+import 'package:aura_mobile_defens/inference/aura_binary_inference.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -29,9 +29,9 @@ void main() {
     ],
   };
 
-  group('AuraAIInference feature calculations', () {
+  group('AuraBinaryInference feature calculations', () {
     test('computes all six features from the normalized host', () {
-      final features = AuraAIInference.extractFeatures('ABBB3.XYZ');
+      final features = AuraBinaryInference.extractFeatures('ABBB3.XYZ');
       const length = 9;
       final expectedEntropy =
           -((3 / length) * (math.log(3 / length) / math.ln2) +
@@ -46,7 +46,7 @@ void main() {
     });
 
     test('does not treat a suspicious-looking substring as the TLD', () {
-      final features = AuraAIInference.extractFeatures('notxyz.example');
+      final features = AuraBinaryInference.extractFeatures('notxyz.example');
 
       expect(features['suspicious_tld'], 0);
     });
@@ -55,15 +55,15 @@ void main() {
   group('Operational robustness', () {
     test('allows clean official domains without allowing suffix bypasses', () {
       expect(
-        AuraAIInference.analyzeHostSecure('google.com', mockModelJson),
+        AuraBinaryInference.analyzeHostSecure('google.com', mockModelJson),
         isTrue,
       );
       expect(
-        AuraAIInference.analyzeHostSecure('whatsapp.net', mockModelJson),
+        AuraBinaryInference.analyzeHostSecure('whatsapp.net', mockModelJson),
         isTrue,
       );
       expect(
-        AuraAIInference.analyzeHostSecure(
+        AuraBinaryInference.analyzeHostSecure(
           'google.com.maliciousdomain.xyz',
           mockModelJson,
         ),
@@ -73,7 +73,7 @@ void main() {
 
     test('classifies high-entropy hosts with suspicious TLDs as threats', () {
       expect(
-        AuraAIInference.analyzeHostSecure(
+        AuraBinaryInference.analyzeHostSecure(
           'x921llmzaqp0182ncnw.xyz',
           mockModelJson,
         ),
@@ -82,16 +82,16 @@ void main() {
     });
 
     test('rejects empty and malformed hosts', () {
-      expect(AuraAIInference.analyzeHostSecure('', mockModelJson), isFalse);
+      expect(AuraBinaryInference.analyzeHostSecure('', mockModelJson), isFalse);
       expect(
-        AuraAIInference.analyzeHostSecure('://google.com', mockModelJson),
+        AuraBinaryInference.analyzeHostSecure('://google.com', mockModelJson),
         isFalse,
       );
     });
 
     test('rejects user-info tricks whose actual host is not allowlisted', () {
       expect(
-        AuraAIInference.analyzeHostSecure(
+        AuraBinaryInference.analyzeHostSecure(
           'https://google.com@attacker.xyz',
           mockModelJson,
         ),
@@ -104,20 +104,20 @@ void main() {
     test('checks all official suffixes and their subdomains', () {
       final threateningModel = _forest(<int>[1, 1, 1]);
 
-      for (final suffix in AuraAIInference.auraStaticWhitelist) {
+      for (final suffix in AuraBinaryInference.auraStaticWhitelist) {
         expect(
-          AuraAIInference.analyzeHostSecure(suffix, threateningModel),
+          AuraBinaryInference.analyzeHostSecure(suffix, threateningModel),
           isTrue,
           reason: 'official suffix: $suffix',
         );
         expect(
-          AuraAIInference.analyzeHostSecure('cdn.$suffix', threateningModel),
+          AuraBinaryInference.analyzeHostSecure('cdn.$suffix', threateningModel),
           isTrue,
           reason: 'official subdomain: cdn.$suffix',
         );
       }
       expect(
-        AuraAIInference.analyzeHostSecure(
+        AuraBinaryInference.analyzeHostSecure(
           'google.com.attacker.xyz',
           threateningModel,
         ),
@@ -130,11 +130,11 @@ void main() {
       final safeMajorityModel = _forest(<int>[1, 0, 0]);
 
       expect(
-        AuraAIInference.analyzeHostSecure('ordinary.example', tiedModel),
+        AuraBinaryInference.analyzeHostSecure('ordinary.example', tiedModel),
         isFalse,
       );
       expect(
-        AuraAIInference.analyzeHostSecure(
+        AuraBinaryInference.analyzeHostSecure(
             'ordinary.example', safeMajorityModel),
         isTrue,
       );
@@ -142,7 +142,7 @@ void main() {
 
     test('rejects unverified hosts when no model is loaded', () {
       expect(
-          AuraAIInference.analyzeHostSecure('ordinary.example', {}), isFalse);
+          AuraBinaryInference.analyzeHostSecure('ordinary.example', {}), isFalse);
     });
   });
 
@@ -172,11 +172,11 @@ void main() {
       ]);
 
       expect(
-        AuraAIInference.evaluateHostFromBinary('normal.example', model),
+        AuraBinaryInference.evaluateHostFromBinary('normal.example', model),
         isTrue,
       );
       expect(
-        AuraAIInference.evaluateHostFromBinary('abcdefghijkl.xyz', model),
+        AuraBinaryInference.evaluateHostFromBinary('abcdefghijkl.xyz', model),
         isFalse,
       );
     });
@@ -200,7 +200,7 @@ void main() {
       ]);
 
       expect(
-        AuraAIInference.evaluateHostFromBinary('abc1.example', model),
+        AuraBinaryInference.evaluateHostFromBinary('abc1.example', model),
         isTrue,
       );
     });
@@ -214,7 +214,7 @@ void main() {
         );
 
         expect(
-          await AuraAIInference.evaluateHostFromBinaryFile(
+          await AuraBinaryInference.evaluateHostFromBinaryFile(
             'normal.example',
             modelFile,
           ),
@@ -237,11 +237,11 @@ void main() {
       ]);
 
       expect(
-        AuraAIInference.evaluateHostFromBinary('normal.example', tiedForest),
+        AuraBinaryInference.evaluateHostFromBinary('normal.example', tiedForest),
         isFalse,
       );
       expect(
-        AuraAIInference.evaluateHostFromBinary('normal.example', safeMajority),
+        AuraBinaryInference.evaluateHostFromBinary('normal.example', safeMajority),
         isTrue,
       );
     });
@@ -250,7 +250,7 @@ void main() {
       final model = _binaryForest(<_BinaryTree>[_leafTree(1)]);
 
       expect(
-        AuraAIInference.evaluateHostFromBinary('normal.example', model),
+        AuraBinaryInference.evaluateHostFromBinary('normal.example', model),
         isFalse,
       );
     });
@@ -267,7 +267,7 @@ void main() {
         ..setRange(0, validModel.length, validModel);
 
       expect(
-        () => AuraAIInference.evaluateHostFromBinary(
+        () => AuraBinaryInference.evaluateHostFromBinary(
           'normal.example',
           invalidMagic,
         ),
@@ -275,11 +275,11 @@ void main() {
       );
       expect(
         () =>
-            AuraAIInference.evaluateHostFromBinary('normal.example', truncated),
+            AuraBinaryInference.evaluateHostFromBinary('normal.example', truncated),
         throwsFormatException,
       );
       expect(
-        () => AuraAIInference.evaluateHostFromBinary(
+        () => AuraBinaryInference.evaluateHostFromBinary(
           'normal.example',
           trailingByte,
         ),
@@ -318,14 +318,14 @@ void main() {
       ]);
 
       expect(
-        () => AuraAIInference.evaluateHostFromBinary(
+        () => AuraBinaryInference.evaluateHostFromBinary(
           'normal.example',
           cyclicForest,
         ),
         throwsFormatException,
       );
       expect(
-        () => AuraAIInference.evaluateHostFromBinary(
+        () => AuraBinaryInference.evaluateHostFromBinary(
           'normal.example',
           invalidFeatureForest,
         ),

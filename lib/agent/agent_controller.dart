@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../ai_brain.dart';
 import '../infrastructure/security/aura_dynamic_whitelist.dart';
 import '../providers/aura_state_provider.dart';
+import '../security_engine.dart';
 import '../voice_engine.dart';
 import 'aura_intent_parser.dart';
 import 'aura_tools.dart';
@@ -25,6 +26,7 @@ class AgentController {
   static const String kernelGreeting =
       '[ KERNEL MASTER ACTIVE ] Aura Centinela en línea. Listo para auditar los sockets. Ingrese un comando o consulta táctica.';
   static final AuraVoiceEngine _voiceEngine = AuraVoiceEngine();
+  static final AuraSecurityEngine _securityEngine = AuraSecurityEngine();
   static const Map<AuraIntentKind, List<String>> _responses = {
     AuraIntentKind.greet: [
       'Saludos, operador. Sistemas de monitoreo listos.',
@@ -284,6 +286,10 @@ class AgentController {
           return;
         }
       }
+      if (intent.kind == AuraIntentKind.securityCheck) {
+        await _runDeviceIntegrityCheck(intent);
+        return;
+      }
       final responseKind = switch (intent.kind) {
         AuraIntentKind.fear => AuraIntentKind.securityCheck,
         AuraIntentKind.provocation => AuraIntentKind.insult,
@@ -456,6 +462,59 @@ class AgentController {
         },
       ),
     );
+  }
+
+  /// Runs the native hostile-environment and anti-tampering probes (pillar 1)
+  /// and reports the real result instead of a canned answer.
+  Future<void> _runDeviceIntegrityCheck(AuraIntent intent) async {
+    _emit(intent.toEvent());
+    Map<String, dynamic> report;
+    try {
+      report = await _securityEngine.checkDeviceIntegrity();
+    } catch (error) {
+      _securityState?.setSecurityLevel(AuraSecurityLevel.warning);
+      _emit(
+        AgentEvent(
+          kind: AgentEventKind.warning,
+          message: 'No se pudo completar la comprobación de integridad: $error',
+          data: const <String, dynamic>{'integrity_check_failed': true},
+        ),
+      );
+      return;
+    }
+    final level = report['level'] as SystemThreatLevel?;
+    final findings = <String>[
+      if (report['rootBinaryFound'] == true) 'binario su',
+      if (report['isDebuggerConnected'] == true) 'depurador conectado',
+      if (report['fridaDetected'] == true) 'Frida',
+      if (report['isVirtualEnvironment'] == true) 'entorno virtual',
+      if (report['isEmulator'] == true) 'emulador',
+      if (report['adbEnabled'] == true) 'ADB activo',
+      if (report['signatureValid'] == false) 'firma no reconocida',
+    ];
+    _securityState?.setSecurityLevel(switch (level) {
+      SystemThreatLevel.critical => AuraSecurityLevel.critical,
+      SystemThreatLevel.warning => AuraSecurityLevel.warning,
+      _ => AuraSecurityLevel.safe,
+    });
+    final summary =
+        report['logs'] as String? ?? 'Comprobación de integridad completada.';
+    final message = findings.isEmpty
+        ? '$summary Son heurísticas locales; no sustituyen una atestación remota.'
+        : '$summary Señales: ${findings.join(', ')}.';
+    _emit(
+      AgentEvent(
+        kind: level == SystemThreatLevel.secure
+            ? AgentEventKind.success
+            : AgentEventKind.warning,
+        message: message,
+        data: <String, dynamic>{
+          ...report,
+          'level': level?.name,
+        },
+      ),
+    );
+    await _speakResponse(message);
   }
 
   void _emit(AgentEvent event) {

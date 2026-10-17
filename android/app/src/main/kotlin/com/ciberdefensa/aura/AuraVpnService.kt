@@ -11,7 +11,6 @@ import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.aura.cyberdefense.AuraNotificationService
 import hev.htproxy.TProxyService
 import java.io.File
 import java.io.IOException

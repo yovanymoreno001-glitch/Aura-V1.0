@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../agent/agent_controller.dart';
 import '../agent/agent_event.dart';
-import '../infrastructure/agent/aura_intent_parser.dart';
+import '../agent/aura_command_executor.dart';
 import '../providers/aura_state_provider.dart';
 
 const Color _terminalGreen = Color(0xFF00FF00);
@@ -80,7 +80,7 @@ class _AuraCoreScreenState extends State<AuraCoreScreen> {
         _scrollToLatest(controller.history.length, force: true);
       }
 
-      final result = await AuraIntentParser.executeCommand(instruction);
+      final result = await AuraCommandExecutor.executeCommand(instruction);
       final response = result['response'];
       if (response is String) {
         final notificationSent = await controller.dispatchRealtimeNotification(

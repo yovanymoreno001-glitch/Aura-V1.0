@@ -1,7 +1,12 @@
-import '../../agent/agent_controller.dart';
-import '../../agent/agent_event.dart';
+import 'agent_controller.dart';
+import 'agent_event.dart';
 
-enum AuraIntent {
+/// Intent categories reported to the console UI after a command runs.
+///
+/// Natural-language parsing lives in [AuraIntentParser] (aura_intent_parser.dart);
+/// this file only executes a command through [AgentController] and maps the
+/// resulting event for display.
+enum AuraCommandIntent {
   blockDomain,
   isolateApp,
   panicIsolation,
@@ -13,14 +18,14 @@ enum AuraIntent {
   unknown,
 }
 
-class AuraIntentParser {
-  AuraIntentParser._();
+class AuraCommandExecutor {
+  AuraCommandExecutor._();
 
   static Future<Map<String, dynamic>> executeCommand(String input) async {
     final command = input.trim();
     if (command.isEmpty) {
       return <String, dynamic>{
-        'intent': AuraIntent.unknown,
+        'intent': AuraCommandIntent.unknown,
         'success': false,
         'response': '[WARN] Escribe una orden o consulta antes de enviarla.',
       };
@@ -35,7 +40,7 @@ class AuraIntentParser {
       final response = '[CRIT] No se pudo ejecutar la orden: $error';
       controller.reportError(response);
       return <String, dynamic>{
-        'intent': AuraIntent.unknown,
+        'intent': AuraCommandIntent.unknown,
         'success': false,
         'response': response,
         'event': controller.history.last,
@@ -50,7 +55,7 @@ class AuraIntentParser {
       const response = '[WARN] No se generó un resultado para la orden.';
       controller.reportError(response);
       return <String, dynamic>{
-        'intent': AuraIntent.unknown,
+        'intent': AuraCommandIntent.unknown,
         'success': false,
         'response': response,
         'event': controller.history.last,
@@ -88,15 +93,15 @@ class AuraIntentParser {
     };
   }
 
-  static AuraIntent _intentFromName(String name) => switch (name) {
-        'block_domain' => AuraIntent.blockDomain,
-        'isolate_app' => AuraIntent.isolateApp,
-        'panic_isolation' => AuraIntent.panicIsolation,
-        'resume_network' => AuraIntent.resumeNetwork,
-        'cryptographic_purge' => AuraIntent.cryptographicPurge,
-        'update_defenses' => AuraIntent.updateModel,
-        'status' => AuraIntent.status,
-        'unknown' => AuraIntent.unknown,
-        _ => AuraIntent.conversation,
+  static AuraCommandIntent _intentFromName(String name) => switch (name) {
+        'block_domain' => AuraCommandIntent.blockDomain,
+        'isolate_app' => AuraCommandIntent.isolateApp,
+        'panic_isolation' => AuraCommandIntent.panicIsolation,
+        'resume_network' => AuraCommandIntent.resumeNetwork,
+        'cryptographic_purge' => AuraCommandIntent.cryptographicPurge,
+        'update_defenses' => AuraCommandIntent.updateModel,
+        'status' => AuraCommandIntent.status,
+        'unknown' => AuraCommandIntent.unknown,
+        _ => AuraCommandIntent.conversation,
       };
 }
